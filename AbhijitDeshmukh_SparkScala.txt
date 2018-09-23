@@ -1,0 +1,246 @@
+ABC Investment Bank(Scala)
+Workspace Access Control is only available in the Databricks Operational Security Package. Learn moreThis notebook will be published publicly and anyone with the below link can view it
+
+https://databricks-prod-cloudfront.cloud.databricks.com/public/4027ec902e239c93eaaa8714f173bcfc/4242893519970855/1484738955848057/7569358457591750/latest.html
+
+
+1
+/*General Ledger System.
+2
+  To Develop Position Calculation Process */
+
+1
+//Creating Session
+2
+import org.apache.spark.SparkConf
+3
+import org.apache.spark.SparkContext
+4
+import org.apache.spark.sql.SQLContext  
+5
+import org.apache.spark.sql.SparkSession
+6
+import org.apache.spark.sql.types._
+7
+import org.apache.spark.sql.functions._
+8
+​
+9
+        val session = SparkSession.builder()
+10
+                        .appName("ABC General Ledger")
+11
+                        .getOrCreate() 
+import org.apache.spark.SparkConf
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.functions._
+session: org.apache.spark.sql.SparkSession = org.apache.spark.sql.SparkSession@248e9301
+Command took 0.35 seconds -- by a111deshmukh@gmail.com at 9/23/2018, 4:54:34 PM on My Cluster
+
+1
+//Reading Input_StartOfDay_Positions File
+2
+​
+3
+val df_Input_StartOfDay_Positions = session
+4
+                                           .read
+5
+                                           .format("csv")
+6
+                                           .option("header","true")
+7
+                                           .load("/FileStore/tables/Input_StartOfDay_Positions.txt")
+8
+                                           .withColumnRenamed("Instrument","Pos_Instrument")  
+(1) Spark Jobs
+df_Input_StartOfDay_Positions:org.apache.spark.sql.DataFrame = [Pos_Instrument: string, Account: string ... 2 more fields]
+df_Input_StartOfDay_Positions: org.apache.spark.sql.DataFrame = [Pos_Instrument: string, Account: string ... 2 more fields]
+Command took 1.03 seconds -- by a111deshmukh@gmail.com at 9/23/2018, 6:15:05 PM on My Cluster
+
+1
+//Showing Input_StartOfDay_Positions File Contents
+2
+df_Input_StartOfDay_Positions.show(false)
+(1) Spark Jobs
++--------------+-------+-----------+----------+
+|Pos_Instrument|Account|AccountType|Quantity  |
++--------------+-------+-----------+----------+
+|IBM           |101    |E          |100000    |
+|IBM           |201    |I          |-100000   |
+|MSFT          |101    |E          |5000000   |
+|MSFT          |201    |I          |-5000000  |
+|APPL          |101    |E          |10000     |
+|APPL          |201    |I          |-10000    |
+|AMZN          |101    |E          |-10000    |
+|AMZN          |201    |I          |10000     |
+|NFLX          |101    |E          |100000000 |
+|NFLX          |201    |I          |-100000000|
++--------------+-------+-----------+----------+
+
+Command took 0.35 seconds -- by a111deshmukh@gmail.com at 9/23/2018, 6:15:11 PM on My Cluster
+
+1
+//Reading Transactions File
+2
+val df_Transactions = session
+3
+                           .read
+4
+                           .option("multiLine","true")
+5
+                           .json("/FileStore/tables/1537277231233_Input_Transactions.txt")
+6
+                           .withColumnRenamed("Instrument","Trx_Instrument")
+7
+                             
+8
+                           
+(1) Spark Jobs
+df_Transactions:org.apache.spark.sql.DataFrame = [Trx_Instrument: string, TransactionId: long ... 2 more fields]
+df_Transactions: org.apache.spark.sql.DataFrame = [Trx_Instrument: string, TransactionId: bigint ... 2 more fields]
+Command took 0.75 seconds -- by a111deshmukh@gmail.com at 9/23/2018, 6:14:02 PM on My Cluster
+
+1
+//Showing Transactions File Contents
+2
+df_Transactions.show
+(1) Spark Jobs
++--------------+-------------+-------------------+---------------+
+|Trx_Instrument|TransactionId|TransactionQuantity|TransactionType|
++--------------+-------------+-------------------+---------------+
+|           IBM|            1|               1000|              B|
+|          APPL|            2|                200|              S|
+|          AMZN|            3|               5000|              S|
+|          MSFT|            4|                 50|              B|
+|          APPL|            5|                100|              B|
+|          APPL|            6|              20000|              S|
+|          AMZN|            7|               5000|              S|
+|          MSFT|            8|                300|              S|
+|          AMZN|            9|                200|              B|
+|          APPL|           10|               9000|              B|
+|          AMZN|           11|               5000|              S|
+|          AMZN|           12|                 50|              S|
++--------------+-------------+-------------------+---------------+
+
+Command took 0.38 seconds -- by a111deshmukh@gmail.com at 9/23/2018, 6:14:09 PM on My Cluster
+
+left
+1
+//Joining positions and Transactions on Instruments
+2
+​
+3
+val df_Join_Positions_Transactions = df_Input_StartOfDay_Positions
+4
+                                                  .join(df_Transactions,$"Pos_Instrument" === $"Trx_Instrument","left")
+5
+                                                  .groupBy("Pos_Instrument","Account","AccountType","TransactionType")
+6
+                                                  .agg(sum("Quantity").alias("Quantity"),
+7
+                                                       sum("TransactionQuantity").alias("TransactionQuantity")
+8
+                                                       )
+9
+                                                  .withColumnRenamed("Pos_Instrument","Instrument")  
+10
+​
+11
+                                            
+12
+​
+df_Join_Positions_Transactions:org.apache.spark.sql.DataFrame = [Instrument: string, Account: string ... 4 more fields]
+df_Join_Positions_Transactions: org.apache.spark.sql.DataFrame = [Instrument: string, Account: string ... 4 more fields]
+Command took 0.76 seconds -- by a111deshmukh@gmail.com at 9/23/2018, 8:40:10 PM on My Cluster
+
+1
+//Showing Join Result
+2
+df_Join_Positions_Transactions.show(false)
+(5) Spark Jobs
++----------+-------+-----------+---------------+----------+-------------------+
+|Instrument|Account|AccountType|TransactionType|Quantity  |TransactionQuantity|
++----------+-------+-----------+---------------+----------+-------------------+
+|MSFT      |101    |E          |S              |5000000.0 |300                |
+|MSFT      |101    |E          |B              |5000000.0 |50                 |
+|MSFT      |201    |I          |B              |-5000000.0|50                 |
+|APPL      |201    |I          |B              |-20000.0  |9100               |
+|APPL      |101    |E          |B              |20000.0   |9100               |
+|AMZN      |201    |I          |B              |10000.0   |200                |
+|IBM       |201    |I          |B              |-100000.0 |1000               |
+|APPL      |101    |E          |S              |20000.0   |20200              |
+|AMZN      |101    |E          |S              |-40000.0  |15050              |
+|AMZN      |201    |I          |S              |40000.0   |15050              |
+|APPL      |201    |I          |S              |-20000.0  |20200              |
+|IBM       |101    |E          |B              |100000.0  |1000               |
+|MSFT      |201    |I          |S              |-5000000.0|300                |
+|NFLX      |201    |I          |null           |-1.0E8    |null               |
+|NFLX      |101    |E          |null           |1.0E8     |null               |
+|AMZN      |101    |E          |B              |-10000.0  |200                |
++----------+-------+-----------+---------------+----------+-------------------+
+
+Command took 1.35 seconds -- by a111deshmukh@gmail.com at 9/23/2018, 8:40:34 PM on My Cluster
+
+1
+//Main Logic,Adding Delta Column and Selecting Only Required Columns 
+2
+val df_Expected_EndOfDay_Position = df_Join_Positions_Transactions
+3
+                                            .withColumn("NewQuantity",when(($"TransactionType"==="B") and                                                                                                                  ($"AccountType"==="E"),$"Quantity"+$"TransactionQuantity")
+4
+                                            .when(($"TransactionType"==="B") and ($"AccountType"==="I"),($"Quantity"-$"TransactionQuantity"))
+5
+                                            .when(($"TransactionType"==="S")and($"AccountType"==="E"),($"Quantity"-$"TransactionQuantity"))
+6
+                                            .when(($"TransactionType"==="S")and($"AccountType"==="I"),($"Quantity"+$"TransactionQuantity")) 
+7
+                                                     )
+8
+                                            .groupBy("Instrument","Account","AccountType")
+9
+                                            .agg(sum("Quantity").alias("Quantity"),
+10
+                                                 sum("NewQuantity").alias("NewQuantity")
+11
+                                                )  
+12
+                                            .withColumn("Delta",$"NewQuantity" - $"Quantity")
+13
+                                            .na.fill(Map("NewQuantity"->"0","Delta"->"0"))
+14
+                                            .drop("Quantity") 
+15
+                                            .withColumnRenamed("NewQuantity","Quantity")
+16
+                                            .select("Instrument","Account","AccountType","Quantity","Delta") 
+17
+                                            .orderBy($"Instrument",$"Account")  
+18
+                  
+df_Expected_EndOfDay_Position:org.apache.spark.sql.Dataset[org.apache.spark.sql.Row] = [Instrument: string, Account: string ... 3 more fields]
+df_Expected_EndOfDay_Position: org.apache.spark.sql.Dataset[org.apache.spark.sql.Row] = [Instrument: string, Account: string ... 3 more fields]
+Command took 0.96 seconds -- by a111deshmukh@gmail.com at 9/23/2018, 9:43:06 PM on My Cluster
+
+1
+//Final Required Output
+2
+df_Expected_EndOfDay_Position.show(false)
+(1) Spark Jobs
++----------+-------+-----------+----------+--------+
+|Instrument|Account|AccountType|Quantity  |Delta   |
++----------+-------+-----------+----------+--------+
+|AMZN      |101    |E          |-64850.0  |-14850.0|
+|AMZN      |201    |I          |64850.0   |14850.0 |
+|APPL      |101    |E          |28900.0   |-11100.0|
+|APPL      |201    |I          |-28900.0  |11100.0 |
+|IBM       |101    |E          |101000.0  |1000.0  |
+|IBM       |201    |I          |-101000.0 |-1000.0 |
+|MSFT      |101    |E          |9999750.0 |-250.0  |
+|MSFT      |201    |I          |-9999750.0|250.0   |
+|NFLX      |101    |E          |0.0       |0.0     |
+|NFLX      |201    |I          |0.0       |0.0     |
++----------+-------+-----------+----------+--------+
